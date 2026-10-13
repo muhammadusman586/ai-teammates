@@ -1,0 +1,3 @@
+# Agent skills (symlinks break the Railpack copy step; not needed at runtime)
+.claude
+.agents
