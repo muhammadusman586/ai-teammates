@@ -1,6 +1,7 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
+import { refresh } from "next/cache"
 import type { z } from "zod"
 
 import { db } from "@/db"
@@ -12,7 +13,7 @@ export async function createBot(input: z.input<typeof insertBotSchema>) {
   const values = insertBotSchema.parse(input)
 
   // node-postgres has no db.batch (neon-http only); a transaction gives the same all-or-nothing write
-  return db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const [bot] = await tx
       .insert(bots)
       .values({ ...values, userId })
@@ -25,4 +26,8 @@ export async function createBot(input: z.input<typeof insertBotSchema>) {
 
     return { botId: bot.id, chatId: chat.id }
   })
+
+  // The sidebar's chat list is rendered by the layout, so re-render it to show the new chat
+  refresh()
+  return created
 }

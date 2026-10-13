@@ -47,12 +47,23 @@ const JOB_PRESETS: Record<string, string> = {
 }
 const JOB_TAGS = Object.keys(JOB_PRESETS)
 
-export function BotDialog({ children }: { children: React.ReactElement }) {
-  const [open, setOpen] = useState(false)
+export function BotDialog({
+  children,
+  open: openProp,
+  onOpenChange,
+}: {
+  children?: React.ReactElement
+  // Controlled from outside when there's no trigger, e.g. opened from a menu item
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  const [openState, setOpenState] = useState(false)
+  const open = openProp ?? openState
+  const setOpen = onOpenChange ?? setOpenState
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={children} />
+      {children && <DialogTrigger render={children} />}
       <DialogContent className="sm:max-w-md">
         {/* Popup unmounts on close, so every open starts with a fresh form */}
         <BotForm onCreated={() => setOpen(false)} />
