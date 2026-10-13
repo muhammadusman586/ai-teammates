@@ -2,12 +2,24 @@
 
 import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ShuffleIcon } from "lucide-react"
+import { ShuffleIcon, Trash2Icon } from "lucide-react"
 import { nanoid } from "nanoid"
+import { useRouter } from "next/navigation"
 import { Controller, useForm } from "react-hook-form"
 
-import { createBot } from "@/actions/bot"
+import { createBot, deleteBot, updateBot } from "@/actions/bot"
 import { ChatAvatar } from "@/components/chat-avatar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -33,7 +45,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { insertBotSchema } from "@/db/schema"
+import { type bots, insertBotSchema } from "@/db/schema"
 
 const JOB_PRESETS: Record<string, string> = {
   "Research assistant":
@@ -47,11 +59,19 @@ const JOB_PRESETS: Record<string, string> = {
 }
 const JOB_TAGS = Object.keys(JOB_PRESETS)
 
+type Bot = Pick<
+  typeof bots.$inferSelect,
+  "id" | "name" | "avatar" | "job" | "instructions"
+>
+
 export function BotDialog({
+  bot,
   children,
   open: openProp,
   onOpenChange,
 }: {
+  // Edits this bot when given, otherwise creates a new one
+  bot?: Bot
   children?: React.ReactElement
   // Controlled from outside when there's no trigger, e.g. opened from a menu item
   open?: boolean
@@ -66,25 +86,34 @@ export function BotDialog({
       {children && <DialogTrigger render={children} />}
       <DialogContent className="sm:max-w-md">
         {/* Popup unmounts on close, so every open starts with a fresh form */}
-        <BotForm onCreated={() => setOpen(false)} />
+        <BotForm bot={bot} onDone={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   )
 }
 
-function BotForm({ onCreated }: { onCreated: () => void }) {
+function BotForm({ bot, onDone }: { bot?: Bot; onDone: () => void }) {
   const form = useForm({
     resolver: zodResolver(insertBotSchema),
-    defaultValues: { name: "", avatar: nanoid(), job: "", instructions: "" },
+    defaultValues: {
+      name: bot?.name ?? "",
+      avatar: bot?.avatar ?? nanoid(),
+      job: bot?.job ?? "",
+      instructions: bot?.instructions ?? "",
+    },
   })
 
   async function onSubmit(values: Parameters<typeof createBot>[0]) {
     try {
-      await createBot(values)
-      toast.add({ title: "Bot created", type: "success" })
-      onCreated()
+      if (bot) await updateBot(bot.id, values)
+      else await createBot(values)
+      toast.add({ title: bot ? "Bot updated" : "Bot created", type: "success" })
+      onDone()
     } catch {
-      toast.add({ title: "Couldn't create bot", type: "error" })
+      toast.add({
+        title: bot ? "Couldn't update bot" : "Couldn't create bot",
+        type: "error",
+      })
     }
   }
 
@@ -94,7 +123,7 @@ function BotForm({ onCreated }: { onCreated: () => void }) {
       className="flex flex-col gap-4"
     >
       <DialogHeader>
-        <DialogTitle>New bot</DialogTitle>
+        <DialogTitle>{bot ? "Edit bot" : "New bot"}</DialogTitle>
         <DialogDescription>
           Give it a face, a name, and a job to do.
         </DialogDescription>
@@ -207,14 +236,74 @@ function BotForm({ onCreated }: { onCreated: () => void }) {
         />
       </FieldGroup>
       <DialogFooter>
+        {bot && <DeleteBotButton bot={bot} onDeleted={onDone} />}
         <DialogClose render={<Button type="button" variant="outline" />}>
           Cancel
         </DialogClose>
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting && <Spinner data-icon="inline-start" />}
-          Create bot
+          {bot ? "Save changes" : "Create bot"}
         </Button>
       </DialogFooter>
     </form>
+  )
+}
+
+function DeleteBotButton({
+  bot,
+  onDeleted,
+}: {
+  bot: Bot
+  onDeleted: () => void
+}) {
+  const router = useRouter()
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  async function onDelete() {
+    setIsDeleting(true)
+    try {
+      await deleteBot(bot.id)
+      toast.add({ title: "Bot deleted", type: "success" })
+      onDeleted()
+      // Its chat is gone, so leave the page, then re-render the sidebar without it
+      router.replace("/")
+      router.refresh()
+    } catch {
+      toast.add({ title: "Couldn't delete bot", type: "error" })
+      setIsDeleting(false)
+    }
+  }
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger
+        render={
+          <Button type="button" variant="destructive" className="sm:me-auto" />
+        }
+      >
+        <Trash2Icon data-icon="inline-start" />
+        Delete
+      </AlertDialogTrigger>
+      <AlertDialogContent size="sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {bot.name}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This deletes the bot and its chat. You can&apos;t undo this.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            type="button"
+            variant="destructive"
+            disabled={isDeleting}
+            onClick={onDelete}
+          >
+            {isDeleting && <Spinner data-icon="inline-start" />}
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

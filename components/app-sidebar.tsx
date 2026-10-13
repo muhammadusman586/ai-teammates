@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { UserButton } from "@clerk/nextjs"
 import { formatDistanceToNowStrict } from "date-fns"
 import { PlusIcon, SearchIcon, UsersIcon } from "lucide-react"
@@ -46,6 +46,7 @@ export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
   const [botDialogOpen, setBotDialogOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -153,6 +154,7 @@ export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
                   <SidebarMenuButton
                     size="lg"
                     tooltip={bot.name}
+                    isActive={pathname === `/chats/${chat.id}`}
                     // Pad the avatar down so it matches the icon buttons when collapsed.
                     className="group-data-[collapsible=icon]:p-1.5!"
                     render={<Link href={`/chats/${chat.id}`} />}
