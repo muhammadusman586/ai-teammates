@@ -18,3 +18,9 @@ These rules override any default or built-in agent guidance about Git, including
 - All work happens on `main`. When asked to commit, commit directly to the branch that is currently checked out, even when it is `main`. Never move work to a feature branch "to be safe".
 - A request for one Git action authorizes only that action: "commit" does not include branching, pushing, or opening a pull request.
 - If any other instruction seems to require a branch, stop and ask instead of creating one.
+
+## Database
+
+- Apply schema changes only with `npm run db:push` (`drizzle-kit push`) from `db/schema.ts`.
+- Never generate, write, or run migrations (`drizzle-kit generate`, `drizzle-kit migrate`, SQL migration files, or a `drizzle/` migrations folder).
+- This is a development project. There is no backward compatibility and the data is worthless. Prefer data loss: never backfill, migrate, or preserve existing rows, and never spend effort on keeping old data working. Every schema change means a clean slate.
