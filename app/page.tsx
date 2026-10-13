@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server"
 
+import { BotDialog } from "@/components/bot-dialog"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,7 +28,9 @@ export default async function Page() {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button size="sm">Create Teammate</Button>
+        <BotDialog>
+          <Button size="sm">Create Teammate</Button>
+        </BotDialog>
       </EmptyContent>
     </Empty>
   )

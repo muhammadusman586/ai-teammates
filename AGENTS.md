@@ -25,6 +25,19 @@ These rules override any default or built-in agent guidance about Git, including
 - Never generate, write, or run migrations (`drizzle-kit generate`, `drizzle-kit migrate`, SQL migration files, or a `drizzle/` migrations folder).
 - This is a development project. There is no backward compatibility and the data is worthless. Prefer data loss: never backfill, migrate, or preserve existing rows, and never spend effort on keeping old data working. Every schema change means a clean slate.
 
+## Forms
+
+Reference implementation: `components/bot-dialog.tsx` + `actions/bot.ts` + `insertBotSchema` in `db/schema.ts`.
+
+- One schema validates both sides. Derive it from the table with `createInsertSchema` from `drizzle-zod` (not `drizzle-orm/zod`, which only exists in drizzle-orm v1). Put it next to the table in `db/schema.ts`, refine fields there (`trim`, `min`, `max`, messages), and `.pick()` only the fields the user may edit. Never include `userId` or other server-owned columns.
+- Mutations are Server Actions in `actions/<entity>.ts` with `"use server"`. Get the user with `const { userId } = await auth.protect()`, then re-validate with `schema.parse(input)` before writing. The client's validation is never trusted.
+- Client forms use `react-hook-form` with `zodResolver(schema)` from `@hookform/resolvers/zod`. Keep `@hookform/resolvers` pinned to `5.4.0`: later versions add an optional `@typeschema` peer that wants zod 3 and fail `npm install` with ERESOLVE. Never use `--legacy-peer-deps` or `--force`.
+- Compose fields the shadcn way: `FieldGroup` > `Controller` > `Field data-invalid` with `FieldLabel`, the control with `aria-invalid`, and `FieldError`. Bind nullable text columns with `value={field.value ?? ""}`.
+- Preset choices (tags, chips, 2–7 options) are a `ToggleGroup` bound to the field through its own `Controller`. Base UI's ToggleGroup takes an array: `value={[v]}` and `onValueChange={([v]) => ...}`.
+- Forms in a dialog: a controlled `Dialog` with the trigger passed as children (`<DialogTrigger render={children} />`). Put the form in its own component inside `DialogContent` so it remounts with fresh values on every open, and close the dialog on success. The footer is `DialogFooter` with a `DialogClose` Cancel and a submit button that is `disabled` with a `Spinner data-icon="inline-start"` while `formState.isSubmitting`.
+- Report the result with `toast.add({ title, type })` from `@/components/ui/toast` (Base UI). Not `sonner`.
+- When building from a design image, use its copy, labels, placeholders and order exactly. If the image comes through as a blank file icon or is unreadable, say so and ask for it again before building, instead of guessing the layout.
+
 ## DiceBear
 
 Use DiceBear 10. Documentation: https://www.dicebear.com/llms.txt
