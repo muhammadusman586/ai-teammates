@@ -35,8 +35,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
   sidebarMenuButtonVariants,
 } from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 import type { ChatListItem } from "@/queries/bot"
 
 export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
@@ -58,7 +60,7 @@ export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
   }, [])
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader>
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -89,11 +91,20 @@ export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
         <Button
           variant="ghost"
           onClick={() => setSearchOpen(true)}
-          className="h-8 w-full min-w-0 justify-start rounded-lg border border-input bg-transparent px-2.5 py-1 text-base font-normal text-muted-foreground md:text-sm dark:bg-input/30"
+          className="h-8 w-full min-w-0 justify-start rounded-lg border border-input bg-transparent px-2.5 py-1 text-base font-normal text-muted-foreground group-data-[collapsible=icon]:hidden md:text-sm dark:bg-input/30"
         >
           <SearchIcon data-icon="inline-start" />
           Search
           <Kbd className="ms-auto">⌘K</Kbd>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Search"
+          onClick={() => setSearchOpen(true)}
+          className="hidden group-data-[collapsible=icon]:inline-flex"
+        >
+          <SearchIcon />
         </Button>
         <CommandDialog
           open={searchOpen}
@@ -141,9 +152,15 @@ export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
                 <SidebarMenuItem key={chat.id}>
                   <SidebarMenuButton
                     size="lg"
+                    tooltip={bot.name}
+                    // Pad the avatar down so it matches the icon buttons when collapsed.
+                    className="group-data-[collapsible=icon]:p-1.5!"
                     render={<Link href={`/chats/${chat.id}`} />}
                   >
-                    <ChatAvatar seed={bot.avatar} />
+                    <ChatAvatar
+                      seed={bot.avatar}
+                      className="group-data-[collapsible=icon]:size-5"
+                    />
                     <div className="grid flex-1 text-left leading-tight">
                       <div className="flex items-baseline gap-2">
                         <span className="truncate font-medium">{bot.name}</span>
@@ -176,24 +193,25 @@ export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
               appearance={{
                 elements: {
                   rootBox: "flex w-full",
-                  userButtonTrigger: sidebarMenuButtonVariants({
-                    size: "lg",
+                  userButtonTrigger: cn(
+                    sidebarMenuButtonVariants({ size: "lg" }),
                     // Undo Clerk's button base styles that a plain SidebarMenuButton doesn't have.
-                    className:
-                      "cursor-default justify-start font-normal select-auto",
-                  }),
+                    "shrink-0 cursor-default justify-start font-normal select-auto group-data-[collapsible=icon]:p-1.5!"
+                  ),
                   // Clerk puts the name before the avatar; reverse so the avatar leads.
                   userButtonBox:
                     "min-w-0 flex-1 flex-row-reverse justify-end gap-2",
                   userButtonOuterIdentifier:
-                    "truncate ps-0 text-sm font-normal",
-                  userButtonAvatarBox: "size-6",
+                    "truncate ps-0 text-sm font-normal group-data-[collapsible=icon]:hidden",
+                  userButtonAvatarBox:
+                    "size-6 group-data-[collapsible=icon]:size-5",
                 },
               }}
             />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   )
 }
