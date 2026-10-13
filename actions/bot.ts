@@ -4,17 +4,25 @@ import { auth } from "@clerk/nextjs/server"
 import type { z } from "zod"
 
 import { db } from "@/db"
-import { bots, insertBotSchema } from "@/db/schema"
+import { bots, chatMembers, chats, insertBotSchema } from "@/db/schema"
 
 export async function createBot(input: z.input<typeof insertBotSchema>) {
   const { userId } = await auth.protect()
   // Server Actions are public endpoints: re-validate what the client sent
   const values = insertBotSchema.parse(input)
 
-  const [bot] = await db
-    .insert(bots)
-    .values({ ...values, userId })
-    .returning({ id: bots.id })
+  // node-postgres has no db.batch (neon-http only); a transaction gives the same all-or-nothing write
+  return db.transaction(async (tx) => {
+    const [bot] = await tx
+      .insert(bots)
+      .values({ ...values, userId })
+      .returning({ id: bots.id })
+    const [chat] = await tx
+      .insert(chats)
+      .values({ userId, kind: "direct" })
+      .returning({ id: chats.id })
+    await tx.insert(chatMembers).values({ chatId: chat.id, botId: bot.id })
 
-  return bot
+    return { botId: bot.id, chatId: chat.id }
+  })
 }

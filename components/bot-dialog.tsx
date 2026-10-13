@@ -35,12 +35,17 @@ import { toast } from "@/components/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { insertBotSchema } from "@/db/schema"
 
-const JOB_TAGS = [
-  "Research assistant",
-  "Code reviewer",
-  "Writing editor",
-  "Tutor",
-]
+const JOB_PRESETS: Record<string, string> = {
+  "Research assistant":
+    "Answer briefly, cite sources, and ask before running anything destructive.",
+  "Code reviewer":
+    "Point out bugs, security issues, and unclear code first. Suggest concrete fixes and skip style nitpicks.",
+  "Writing editor":
+    "Tighten wording and fix grammar while keeping my voice. Explain big changes in one line each.",
+  Tutor:
+    "Explain step by step with simple examples. Ask a quick question to check I understood before moving on.",
+}
+const JOB_TAGS = Object.keys(JOB_PRESETS)
 
 export function BotDialog({ children }: { children: React.ReactElement }) {
   const [open, setOpen] = useState(false)
@@ -92,7 +97,14 @@ function BotForm({ onCreated }: { onCreated: () => void }) {
             variant="outline"
             className="flex-wrap"
             value={JOB_TAGS.includes(field.value) ? [field.value] : []}
-            onValueChange={([tag]) => field.onChange(tag ?? "")}
+            onValueChange={([tag]) => {
+              field.onChange(tag ?? "")
+              // Only replace instructions the user hasn't written themselves
+              const current = form.getValues("instructions")
+              if (!current || Object.values(JOB_PRESETS).includes(current)) {
+                form.setValue("instructions", tag ? JOB_PRESETS[tag] : "")
+              }
+            }}
           >
             {JOB_TAGS.map((tag) => (
               <ToggleGroupItem key={tag} value={tag} className="rounded-full">
