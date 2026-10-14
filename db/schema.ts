@@ -16,7 +16,7 @@ export const bots = pgTable(
       .$defaultFn(() => nanoid()), // seed for the bot's generated face
     job: text().notNull(), // what the bot is for, in a phrase
     instructions: text(), // how it should go about the job
-    sandboxId: text("sandbox_id"), // sandbox provider id, created lazily
+    sandboxId: text("sandbox_id"), // Daytona sandbox id, created and deleted with the bot
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("bots_user_id_idx").on(t.userId)]
