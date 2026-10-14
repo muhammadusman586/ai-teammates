@@ -12,7 +12,7 @@ export default async function Page(props: PageProps<"/chats/[chatId]">) {
   return (
     <div className="flex h-svh flex-col">
       <ChatHeader chat={chat} />
-      <Chat key={chatId} />
+      <Chat key={chatId} chatId={chatId} />
     </div>
   )
 }

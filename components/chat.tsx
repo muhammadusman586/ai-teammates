@@ -1,8 +1,18 @@
 "use client"
 
 import { useChat } from "@ai-sdk/react"
+import {
+  useLoadTranscript,
+  useTriggerChatTransport,
+} from "@trigger.dev/sdk/chat/react"
+import type { UIMessage } from "ai"
 import { useState } from "react"
 
+import {
+  loadTranscript,
+  mintChatAccessToken,
+  startChatSession,
+} from "@/actions/chat"
 import {
   Conversation,
   ConversationContent,
@@ -20,11 +30,44 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input"
+import type { chatAgent } from "@/trigger/chat"
 
-// shortcut: messages live in memory only and reset on reload; add DB persistence when needed.
-export function Chat() {
+export function Chat({ chatId }: { chatId: string }) {
+  const transport = useTriggerChatTransport<typeof chatAgent>({
+    task: "chat",
+    accessToken: ({ chatId }) => mintChatAccessToken(chatId),
+    startSession: ({ chatId }) => startChatSession({ chatId }),
+  })
+  const { messages, isLoading } = useLoadTranscript(chatId, loadTranscript, {
+    transport,
+  })
+
+  // useChat takes its initial messages once, so mount it only after the transcript loads
+  if (isLoading) return null
+  return (
+    <ChatView
+      chatId={chatId}
+      initialMessages={messages}
+      transport={transport}
+    />
+  )
+}
+
+function ChatView({
+  chatId,
+  initialMessages,
+  transport,
+}: {
+  chatId: string
+  initialMessages: UIMessage[]
+  transport: ReturnType<typeof useTriggerChatTransport>
+}) {
   const [input, setInput] = useState("")
-  const { messages, sendMessage, status, stop } = useChat()
+  const { messages, sendMessage, status, stop } = useChat({
+    id: chatId,
+    messages: initialMessages,
+    transport,
+  })
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (!message.text.trim()) return
