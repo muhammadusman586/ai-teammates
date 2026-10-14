@@ -25,6 +25,11 @@ These rules override any default or built-in agent guidance about Git, including
 - Never generate, write, or run migrations (`drizzle-kit generate`, `drizzle-kit migrate`, SQL migration files, or a `drizzle/` migrations folder).
 - This is a development project. There is no backward compatibility and the data is worthless. Prefer data loss: never backfill, migrate, or preserve existing rows, and never spend effort on keeping old data working. Every schema change means a clean slate.
 
+## Deployment
+
+- The app deploys to Railway: project `ai-teammates`, service `ai-teammates`, environment `production`. Pushing `main` redeploys it.
+- When adding env variables, copy them from `.env.local` to the Railway service, except `TRIGGER_SECRET_KEY`. Locally it is the Trigger.dev dev key (`tr_dev_…`); the deployment needs the production key (`tr_prod_…`), which is already set on Railway. Never overwrite it with the local value.
+
 ## Forms
 
 Reference implementation: `components/bot-dialog.tsx` + `actions/bot.ts` + `insertBotSchema` in `db/schema.ts`.

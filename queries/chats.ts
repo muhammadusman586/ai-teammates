@@ -22,7 +22,14 @@ export async function getChat(chatId: string) {
         columns: {},
         with: {
           bot: {
-            columns: { id: true, name: true, avatar: true, job: true, instructions: true },
+            columns: {
+              id: true,
+              name: true,
+              avatar: true,
+              job: true,
+              instructions: true,
+              sandboxId: true,
+            },
           },
         },
       },

@@ -1,11 +1,18 @@
 import { MonitorIcon } from "lucide-react"
+import Link from "next/link"
 
 import { BotDialog } from "@/components/bot-dialog"
 import { ChatAvatar } from "@/components/chat-avatar"
 import { Button } from "@/components/ui/button"
 import type { Chat } from "@/queries/chats"
 
-export function ChatHeader({ chat }: { chat: Chat }) {
+export function ChatHeader({
+  chat,
+  desktopOpen,
+}: {
+  chat: Chat
+  desktopOpen: boolean
+}) {
   const bot = chat.members[0]?.bot
 
   return (
@@ -21,10 +28,19 @@ export function ChatHeader({ chat }: { chat: Chat }) {
         </h1>
       )}
       <Button
-        variant="ghost"
+        variant={desktopOpen ? "secondary" : "ghost"}
         size="icon-sm"
-        aria-label="Desktop"
+        aria-label={desktopOpen ? "Hide desktop" : "Show desktop"}
         className="ms-auto"
+        nativeButton={false}
+        render={
+          <Link
+            href={
+              desktopOpen ? `/chats/${chat.id}` : `/chats/${chat.id}?desktop`
+            }
+            scroll={false}
+          />
+        }
       >
         <MonitorIcon />
       </Button>
