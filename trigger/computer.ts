@@ -1,4 +1,4 @@
-import { chat, type InferChatUIMessageFromTools } from "@trigger.dev/sdk/ai"
+import { chat } from "@trigger.dev/sdk/ai"
 import { tool } from "ai"
 import { z } from "zod"
 
@@ -175,5 +175,3 @@ export const computerTools = {
     "Show the person a screenshot of your screen in the chat. Use only when they ask what is on your screen or ask to see it."
   ),
 }
-
-export type ChatUiMessage = InferChatUIMessageFromTools<typeof computerTools>

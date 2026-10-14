@@ -6,6 +6,7 @@ import {
   useTriggerChatTransport,
 } from "@trigger.dev/sdk/chat/react"
 import { isToolUIPart, type UIMessage } from "ai"
+import { ForwardIcon } from "lucide-react"
 import { useState } from "react"
 
 import {
@@ -19,6 +20,7 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
 import { ChatAvatar } from "@/components/chat-avatar"
+import { Badge } from "@/components/ui/badge"
 import { Image } from "@/components/ai-elements/image"
 import {
   Message,
@@ -47,8 +49,7 @@ import {
   type ToolPart,
 } from "@/components/ai-elements/tool"
 import type { BotListItem } from "@/queries/bot"
-import type { chatAgent } from "@/trigger/chat"
-import type { ChatUiMessage } from "@/trigger/computer"
+import type { chatAgent, ChatUiMessage } from "@/trigger/chat"
 
 export function Chat({
   chatId,
@@ -100,8 +101,11 @@ function ChatView({
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (!message.text.trim()) return
-    // The agent reads botId from the turn's metadata to pick who answers
-    sendMessage({ text: message.text }, { metadata: { botId } })
+    // The turn's metadata tells the agent who answers; the message's own is saved with it for the badge
+    sendMessage(
+      { text: message.text, metadata: { botId } },
+      { metadata: { botId } }
+    )
     setInput("")
   }
 
@@ -109,33 +113,65 @@ function ChatView({
     <div className="flex min-h-0 flex-1 flex-col">
       <Conversation>
         <ConversationContent className="mx-auto w-full max-w-3xl">
-          {messages.map((message) => (
-            <Message from={message.role} key={message.id}>
-              <MessageContent>
-                {message.parts.map((part, i) => {
-                  if (part.type === "text")
-                    return (
-                      <MessageResponse key={i}>{part.text}</MessageResponse>
+          {messages.map((message) => {
+            // Only group chats pass bots, so direct chats keep the plain layout
+            const bot = bots.find((b) => b.id === message.metadata?.botId)
+            const isReply = bot && message.role === "assistant"
+
+            return (
+              <Message
+                from={message.role}
+                key={message.id}
+                className={isReply ? "flex-row items-start gap-3" : undefined}
+              >
+                {isReply && <ChatAvatar seed={bot.avatar} className="size-6" />}
+                <MessageContent>
+                  {bot && message.role === "user" && (
+                    // Which bot this prompt was sent to
+                    <Badge variant="outline" className="ps-0.5">
+                      <ChatAvatar seed={bot.avatar} className="size-4" />
+                      {bot.name}
+                    </Badge>
+                  )}
+                  {message.parts.map((part, i) => {
+                    if (part.type === "text")
+                      return (
+                        <MessageResponse key={i}>{part.text}</MessageResponse>
+                      )
+                    if (
+                      part.type === "tool-showScreen" &&
+                      part.state === "output-available"
                     )
-                  if (
-                    part.type === "tool-showScreen" &&
-                    part.state === "output-available"
-                  )
-                    return (
-                      <Image
-                        key={i}
-                        {...part.output}
-                        uint8Array={new Uint8Array()}
-                        alt="Screenshot of the bot's screen"
-                      />
-                    )
-                  if (isToolUIPart(part))
-                    return <ToolCall key={i} part={part} />
-                  return null
-                })}
-              </MessageContent>
-            </Message>
-          ))}
+                      return (
+                        <Image
+                          key={i}
+                          {...part.output}
+                          uint8Array={new Uint8Array()}
+                          alt="Screenshot of the bot's screen"
+                        />
+                      )
+                    if (part.type === "tool-handoff")
+                      // A failed handoff only tells the model to answer itself, so it shows nothing
+                      return (
+                        part.state === "output-available" && (
+                          <p
+                            key={i}
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                          >
+                            <ForwardIcon className="size-3.5 shrink-0" />
+                            {part.output.from} handed off to {part.output.to}:{" "}
+                            {part.output.reason}
+                          </p>
+                        )
+                      )
+                    if (isToolUIPart(part))
+                      return <ToolCall key={i} part={part} />
+                    return null
+                  })}
+                </MessageContent>
+              </Message>
+            )
+          })}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>

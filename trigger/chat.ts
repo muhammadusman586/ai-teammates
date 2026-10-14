@@ -1,6 +1,11 @@
 import { openai } from "@ai-sdk/openai"
 import { chat } from "@trigger.dev/sdk/ai"
-import { stepCountIs } from "ai"
+import {
+  type InferUITools,
+  stepCountIs,
+  type UIDataTypes,
+  type UIMessage,
+} from "ai"
 import { eq } from "drizzle-orm"
 import { z } from "zod"
 
@@ -8,6 +13,17 @@ import { db } from "@/db"
 import { chats } from "@/db/schema"
 
 import { computer, computerTools } from "./computer"
+import { currentBot, instructionsFor, team, teamTools } from "./team"
+
+const tools = { ...computerTools, ...teamTools }
+const directChatTools = Object.keys(computerTools) as (keyof typeof tools)[]
+
+// metadata.botId: which bot wrote an assistant message, so a group chat can show its face
+export type ChatUiMessage = UIMessage<
+  { botId?: string },
+  UIDataTypes,
+  InferUITools<typeof tools>
+>
 
 // No `storage` set: the platform's default transcript storage keeps each conversation, keyed by chatId
 export const chatAgent = chat.agent({
@@ -16,9 +32,18 @@ export const chatAgent = chat.agent({
   // Optional as a whole: boot parses startSession's metadata, which startChatSession never sets
   clientDataSchema: z.object({ botId: z.string().optional() }).optional(),
   // On the config too, so each tool's toModelOutput (screenshots as images) survives later turns
-  tools: computerTools,
+  tools,
   // chat.local must be initialized in onBoot; onTurnStart points it at the turn's bot
-  onBoot: () => computer.init({ sandboxId: null }),
+  onBoot: () => {
+    computer.init({ sandboxId: null })
+    team.init({
+      kind: "direct",
+      name: null,
+      members: [],
+      botId: "",
+      handedOffFrom: null,
+    })
+  },
   // Per turn, not per run: in a group chat each message can go to a different bot
   onTurnStart: async ({ chatId, clientData }) => {
     const found = await db.query.chats.findFirst({
@@ -27,7 +52,17 @@ export const chatAgent = chat.agent({
       with: {
         members: {
           orderBy: (members, { asc }) => [asc(members.joinedAt)],
-          with: { bot: true },
+          with: {
+            bot: {
+              columns: {
+                id: true,
+                name: true,
+                job: true,
+                instructions: true,
+                sandboxId: true,
+              },
+            },
+          },
         },
       },
     })
@@ -37,35 +72,38 @@ export const chatAgent = chat.agent({
       ? found.members.find((m) => m.botId === clientData.botId)?.bot
       : found.members[0]?.bot
     if (!bot) throw new Error(`No such bot in chat ${chatId}`)
+
+    team.kind = found.kind
+    team.name = found.name
+    team.members = found.members.map((m) => m.bot)
+    team.botId = bot.id
+    team.handedOffFrom = null
     computer.sandboxId = bot.sandboxId
-
-    const others = found.members
-      .filter((m) => m.botId !== bot.id)
-      .map((m) => m.bot.name)
-
-    chat.prompt.set(
-      [
-        `You are ${bot.name}, an AI teammate.`,
-        `Your job: ${bot.job}`,
-        bot.instructions && `How to go about it:\n${bot.instructions}`,
-        found.kind === "group"
-          ? `You are in a group chat called "${found.name}" with the person who created you and other AI teammates: ${others.join(", ")}. The person picks who answers each message, and they picked you. Earlier assistant replies may be from your teammates. Stay in your role and help them with your job.`
-          : `You are talking with the person who created you, in a one-on-one chat. Stay in your role and help them with your job.`,
-        `You have your own computer: an isolated Linux sandbox (Daytona${bot.sandboxId ? `, id ${bot.sandboxId}` : ""}). It belongs only to you, is separate from the person's machine, and its files persist between conversations.`,
-        `Use your tools to work on that computer: run commands, read and write files, and drive its desktop (1024x768) with the mouse and keyboard. Mouse coordinates are pixels in your screenshots. Look at the screen with viewScreen before you click, and again afterwards to check the result. Only say you did something if a tool actually did it.`,
-      ]
-        .filter(Boolean)
-        .join("\n\n")
-    )
+    // Read at the end of the stream too, so a handed-off reply is stamped with the teammate who wrote it
+    chat.setUIMessageStreamOptions({
+      messageMetadata: ({ part }) =>
+        part.type === "start" || part.type === "finish"
+          ? { botId: team.botId }
+          : undefined,
+    })
+    chat.prompt.set(instructionsFor(bot))
   },
   // streamText from the run argument, not from "ai", so the managed options apply
-  run: async ({ messages, tools, signal, streamText }) =>
-    streamText({
+  run: async ({ messages, tools, signal, streamText }) => {
+    const firstBotId = team.botId
+    return streamText({
       model: openai("gpt-6.1-sol"),
       messages,
       tools,
+      activeTools: team.kind === "group" ? undefined : directChatTools,
+      // After a handoff, the remaining steps run as the teammate, with their prompt
+      prepareStep: () =>
+        team.botId === firstBotId
+          ? undefined
+          : { system: instructionsFor(currentBot()) },
       // The default is one step; computer use needs a look-act-look loop
       stopWhen: stepCountIs(50),
       abortSignal: signal,
-    }),
+    })
+  },
 })
