@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { relations } from "drizzle-orm";
 import { index, pgEnum, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
 
 export const bots = pgTable(
   "bots",
@@ -46,6 +47,13 @@ export const chats = pgTable(
   },
   (t) => [index("chats_user_id_idx").on(t.userId)]
 );
+
+// A schema, not a refinement, so the nullable name column becomes required for groups
+export const insertGroupChatSchema = createInsertSchema(chats, {
+  name: z.string().trim().min(1, "Name is required.").max(50),
+})
+  .pick({ name: true })
+  .extend({ botIds: z.array(z.string()).min(2, "Pick at least two bots.") });
 
 export const chatMembers = pgTable(
   "chat_members",

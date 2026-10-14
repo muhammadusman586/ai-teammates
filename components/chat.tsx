@@ -18,6 +18,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
+import { ChatAvatar } from "@/components/chat-avatar"
 import { Image } from "@/components/ai-elements/image"
 import {
   Message,
@@ -28,8 +29,14 @@ import {
   PromptInput,
   PromptInputFooter,
   type PromptInputMessage,
+  PromptInputSelect,
+  PromptInputSelectContent,
+  PromptInputSelectItem,
+  PromptInputSelectTrigger,
+  PromptInputSelectValue,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
 } from "@/components/ai-elements/prompt-input"
 import {
   Tool,
@@ -39,10 +46,18 @@ import {
   ToolOutput,
   type ToolPart,
 } from "@/components/ai-elements/tool"
+import type { BotListItem } from "@/queries/bot"
 import type { chatAgent } from "@/trigger/chat"
 import type { ChatUiMessage } from "@/trigger/computer"
 
-export function Chat({ chatId }: { chatId: string }) {
+export function Chat({
+  chatId,
+  bots,
+}: {
+  chatId: string
+  // The group's bots to pick from; empty for a direct chat
+  bots: BotListItem[]
+}) {
   const transport = useTriggerChatTransport<typeof chatAgent>({
     task: "chat",
     accessToken: ({ chatId }) => mintChatAccessToken(chatId),
@@ -59,6 +74,7 @@ export function Chat({ chatId }: { chatId: string }) {
       chatId={chatId}
       initialMessages={messages}
       transport={transport}
+      bots={bots}
     />
   )
 }
@@ -67,12 +83,15 @@ function ChatView({
   chatId,
   initialMessages,
   transport,
+  bots,
 }: {
   chatId: string
   initialMessages: UIMessage[]
   transport: ReturnType<typeof useTriggerChatTransport>
+  bots: BotListItem[]
 }) {
   const [input, setInput] = useState("")
+  const [botId, setBotId] = useState(bots[0]?.id)
   const { messages, sendMessage, status, stop } = useChat<ChatUiMessage>({
     id: chatId,
     messages: initialMessages as ChatUiMessage[],
@@ -81,7 +100,8 @@ function ChatView({
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (!message.text.trim()) return
-    sendMessage({ text: message.text })
+    // The agent reads botId from the turn's metadata to pick who answers
+    sendMessage({ text: message.text }, { metadata: { botId } })
     setInput("")
   }
 
@@ -126,6 +146,31 @@ function ChatView({
             onChange={(e) => setInput(e.currentTarget.value)}
           />
           <PromptInputFooter>
+            {bots.length > 0 && (
+              <PromptInputTools>
+                <PromptInputSelect
+                  value={botId}
+                  onValueChange={(value) =>
+                    typeof value === "string" && setBotId(value)
+                  }
+                >
+                  <PromptInputSelectTrigger aria-label="Bot to talk to">
+                    <PromptInputSelectValue className="items-center gap-1.5">
+                      {(id: string) => (
+                        <BotOption bot={bots.find((b) => b.id === id)} />
+                      )}
+                    </PromptInputSelectValue>
+                  </PromptInputSelectTrigger>
+                  <PromptInputSelectContent>
+                    {bots.map((bot) => (
+                      <PromptInputSelectItem key={bot.id} value={bot.id}>
+                        <BotOption bot={bot} />
+                      </PromptInputSelectItem>
+                    ))}
+                  </PromptInputSelectContent>
+                </PromptInputSelect>
+              </PromptInputTools>
+            )}
             <PromptInputSubmit
               status={status}
               onStop={stop}
@@ -136,6 +181,16 @@ function ChatView({
         </PromptInput>
       </div>
     </div>
+  )
+}
+
+function BotOption({ bot }: { bot?: BotListItem }) {
+  if (!bot) return null
+  return (
+    <>
+      <ChatAvatar seed={bot.avatar} className="size-4" />
+      {bot.name}
+    </>
   )
 }
 

@@ -8,7 +8,8 @@ import { formatDistanceToNowStrict } from "date-fns"
 import { PlusIcon, SearchIcon, UsersIcon } from "lucide-react"
 
 import { BotDialog } from "@/components/bot-dialog"
-import { ChatAvatar } from "@/components/chat-avatar"
+import { GroupChatAvatar } from "@/components/group-chat-avatar"
+import { GroupChatDialog } from "@/components/group-chat-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -39,11 +40,23 @@ import {
   sidebarMenuButtonVariants,
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
-import type { ChatListItem } from "@/queries/bot"
+import type { BotListItem, ChatListItem } from "@/queries/bot"
 
-export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
-  // The dialog lives outside the menu, which unmounts its items on close.
+// A group goes by its own name; a direct chat by its bot's
+const chatName = (chat: ChatListItem) =>
+  chat.name ?? chat.members[0]?.bot.name ?? ""
+const chatSeeds = (chat: ChatListItem) => chat.members.map((m) => m.bot.avatar)
+
+export function AppSidebar({
+  chats,
+  bots,
+}: {
+  chats: ChatListItem[]
+  bots: BotListItem[]
+}) {
+  // The dialogs live outside the menu, which unmounts its items on close.
   const [botDialogOpen, setBotDialogOpen] = useState(false)
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
@@ -81,13 +94,18 @@ export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
               <PlusIcon />
               Create new bot
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setGroupDialogOpen(true)}>
               <UsersIcon />
               Create group chat
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <BotDialog open={botDialogOpen} onOpenChange={setBotDialogOpen} />
+        <GroupChatDialog
+          bots={bots}
+          open={groupDialogOpen}
+          onOpenChange={setGroupDialogOpen}
+        />
         {/* Input's classes on a ghost button, so it looks like a field but keeps the button hover. */}
         <Button
           variant="ghost"
@@ -119,21 +137,23 @@ export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
               <CommandEmpty>No chats found.</CommandEmpty>
               <CommandGroup heading="Chats">
                 {chats.map((chat) => {
-                  const bot = chat.members[0]?.bot
-                  if (!bot) return null
+                  if (!chat.members.length) return null
 
                   return (
                     <CommandItem
                       key={chat.id}
                       value={chat.id}
-                      keywords={[bot.name]}
+                      keywords={[chatName(chat)]}
                       onSelect={() => {
                         setSearchOpen(false)
                         router.push(`/chats/${chat.id}`)
                       }}
                     >
-                      <ChatAvatar seed={bot.avatar} className="size-6" />
-                      <span className="truncate">{bot.name}</span>
+                      <GroupChatAvatar
+                        seeds={chatSeeds(chat)}
+                        className="size-6"
+                      />
+                      <span className="truncate">{chatName(chat)}</span>
                     </CommandItem>
                   )
                 })}
@@ -146,26 +166,27 @@ export function AppSidebar({ chats }: { chats: ChatListItem[] }) {
         <SidebarGroup>
           <SidebarMenu>
             {chats.map((chat) => {
-              const bot = chat.members[0]?.bot
-              if (!bot) return null
+              if (!chat.members.length) return null
 
               return (
                 <SidebarMenuItem key={chat.id}>
                   <SidebarMenuButton
                     size="lg"
-                    tooltip={bot.name}
+                    tooltip={chatName(chat)}
                     isActive={pathname === `/chats/${chat.id}`}
                     // Pad the avatar down so it matches the icon buttons when collapsed.
                     className="group-data-[collapsible=icon]:p-1.5!"
                     render={<Link href={`/chats/${chat.id}`} />}
                   >
-                    <ChatAvatar
-                      seed={bot.avatar}
+                    <GroupChatAvatar
+                      seeds={chatSeeds(chat)}
                       className="group-data-[collapsible=icon]:size-5"
                     />
                     <div className="grid flex-1 text-left leading-tight">
                       <div className="flex items-baseline gap-2">
-                        <span className="truncate font-medium">{bot.name}</span>
+                        <span className="truncate font-medium">
+                          {chatName(chat)}
+                        </span>
                         {/* Relative time differs between the server render and hydration */}
                         <span
                           suppressHydrationWarning

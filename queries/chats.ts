@@ -13,12 +13,10 @@ export async function getChat(chatId: string) {
     // Scoped to the owner, so another user's chat id reads as not found
     where: (chats, { and, eq }) =>
       and(eq(chats.id, chatId), eq(chats.userId, userId)),
-    columns: { id: true },
+    columns: { id: true, kind: true, name: true },
     with: {
-      // Group chats aren't handled yet, so the first bot to join stands in for the chat
       members: {
         orderBy: (members, { asc }) => [asc(members.joinedAt)],
-        limit: 1,
         columns: {},
         with: {
           bot: {

@@ -12,15 +12,31 @@ export async function getChats() {
   return db.query.chats.findMany({
     where: (chats, { eq }) => eq(chats.userId, userId),
     orderBy: (chats, { desc }) => [desc(chats.lastMessageAt)],
-    columns: { id: true, lastMessagePreview: true, lastMessageAt: true },
+    columns: {
+      id: true,
+      kind: true,
+      name: true,
+      lastMessagePreview: true,
+      lastMessageAt: true,
+    },
     with: {
-      // Group chats aren't handled yet, so the first bot to join stands in for the chat
       members: {
         orderBy: (members, { asc }) => [asc(members.joinedAt)],
-        limit: 1,
         columns: {},
         with: { bot: { columns: { name: true, avatar: true } } },
       },
     },
+  })
+}
+
+export type BotListItem = Awaited<ReturnType<typeof getBots>>[number]
+
+export async function getBots() {
+  const { userId } = await auth.protect()
+
+  return db.query.bots.findMany({
+    where: (bots, { eq }) => eq(bots.userId, userId),
+    orderBy: (bots, { asc }) => [asc(bots.createdAt)],
+    columns: { id: true, name: true, avatar: true },
   })
 }
